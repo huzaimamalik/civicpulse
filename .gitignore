@@ -1,0 +1,16 @@
+reference/
+
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+coverage/
+.npm-cache/
+.qa/
+*.tsbuildinfo
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
