@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
-from .cache import Cache
+from .cache import Cache, RedisRateLimiter
 from .logging_config import configure_logging
 from .models import (
     Category,
@@ -32,23 +32,29 @@ REQUESTS = Counter("civicpulse_requests_total", "HTTP requests", ["method", "pat
 REQUEST_LATENCY = Histogram("civicpulse_request_latency_seconds", "HTTP request latency", ["path"])
 TRIAGE_LATENCY = Histogram("civicpulse_triage_latency_seconds", "Triage latency")
 FALLBACKS = Counter("civicpulse_triage_fallback_total", "Triage fallbacks")
+STATS_CACHE_KEY = "civicpulse:stats"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
     settings = get_settings()
-    repository = (
-        SqlAlchemyComplaintRepository(settings.database_url)
-        if settings.database_url.startswith("postgresql")
-        else ComplaintRepository()
-    )
+    if settings.testing:
+        repository = ComplaintRepository()
+    else:
+        if not settings.database_url.startswith("postgresql"):
+            raise RuntimeError("DATABASE_URL must point to PostgreSQL outside test mode")
+        repository = SqlAlchemyComplaintRepository(settings.database_url)
     provider = FailingTriage() if settings.triage_provider == "failing" else SimulatedTriage()
     triage = TriageService(provider=provider, fallback=SimulatedTriage(), outcomes=deque(maxlen=20))
     app.state.repository = repository
-    app.state.cache = Cache(settings.redis_url)
+    app.state.cache = Cache(settings.redis_url, allow_in_memory=settings.testing)
     app.state.service = ComplaintService(repository, triage)
-    app.state.rate_limiter = RateLimiter(settings.rate_limit_per_min)
+    app.state.rate_limiter = (
+        RateLimiter(settings.rate_limit_per_min)
+        if settings.testing
+        else RedisRateLimiter(app.state.cache.redis_client, settings.rate_limit_per_min)
+    )
     app.state.active_provider = provider.name
     yield
     if hasattr(repository, "engine"):
@@ -99,8 +105,9 @@ async def ready(request: Request):
 async def create_complaint(request: Request, data: ComplaintCreate, response: Response):
     client_key = request.client.host if request.client else "unknown"
     if not request.app.state.rate_limiter.allow(client_key):
-        response.headers["Retry-After"] = "60"
-        raise HTTPException(status_code=429, detail="rate limit exceeded", headers={"Retry-After": "60"})
+        retry_after = str(request.app.state.rate_limiter.retry_after())
+        response.headers["Retry-After"] = retry_after
+        raise HTTPException(status_code=429, detail="rate limit exceeded", headers={"Retry-After": retry_after})
     complaint, fallback_used, error_class = request.app.state.service.create(data)
     TRIAGE_LATENCY.observe(complaint.triage_latency_ms / 1000)
     if fallback_used:
@@ -109,7 +116,7 @@ async def create_complaint(request: Request, data: ComplaintCreate, response: Re
             "triage fallback",
             extra={"complaint_id": str(complaint.id), "provider": "rules:fallback", "error_class": error_class},
         )
-    request.app.state.cache.delete("stats")
+    request.app.state.cache.delete(STATS_CACHE_KEY)
     return complaint
 
 
@@ -142,18 +149,18 @@ async def update_status(request: Request, complaint_id: UUID, data: StatusUpdate
         raise HTTPException(status_code=409, detail=str(error)) from error
     if complaint is None:
         raise HTTPException(status_code=404, detail="complaint not found")
-    request.app.state.cache.delete("stats")
+    request.app.state.cache.delete(STATS_CACHE_KEY)
     return complaint
 
 
 @app.get("/api/stats", response_model=Stats)
 async def stats(request: Request, response: Response):
-    cached = request.app.state.cache.get_json("stats")
+    cached = request.app.state.cache.get_json(STATS_CACHE_KEY)
     if cached is not None:
         response.headers["X-Cache"] = "HIT"
         return cached
     value = request.app.state.repository.stats()
-    request.app.state.cache.set_json("stats", value, 30)
+    request.app.state.cache.set_json(STATS_CACHE_KEY, value, 30)
     response.headers["X-Cache"] = "MISS"
     return value
 
