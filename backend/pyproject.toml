@@ -2,3 +2,6 @@
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "--strict-markers"
+markers = [
+	"integration: tests that require the live PostgreSQL and Redis development containers",
+]

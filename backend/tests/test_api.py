@@ -1,7 +1,10 @@
 from uuid import uuid4
+import os
 
 import pytest
 from fastapi.testclient import TestClient
+
+os.environ["TESTING"] = "true"
 
 from app.main import app
 from app.services import FailingTriage
@@ -11,7 +14,7 @@ from app.services import FailingTriage
 def client():
     with TestClient(app) as test_client:
         app.state.repository._items.clear()
-        app.state.cache.delete("stats")
+        app.state.cache.delete("civicpulse:stats")
         app.state.rate_limiter._hits.clear()
         app.state.rate_limiter.limit = 10
         app.state.service.triage.provider = app.state.service.triage.fallback
