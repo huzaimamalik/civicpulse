@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import DateTime, Engine, Integer, String, Text, create_engine, select, text
+from sqlalchemy.dialects.postgresql import ENUM, UUID as PostgreSQLUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from .models import Category, Complaint, Priority, Status
@@ -14,13 +15,21 @@ class Base(DeclarativeBase):
 class ComplaintRow(Base):
     __tablename__ = "complaints"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     location: Mapped[str] = mapped_column(String(200), nullable=False)
     reporter_contact: Mapped[str | None] = mapped_column(String(255))
-    category: Mapped[str] = mapped_column(String(30), nullable=False)
-    priority: Mapped[str] = mapped_column(String(10), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    category: Mapped[str] = mapped_column(
+        ENUM("water", "electricity", "sanitation", "roads", "streetlights", "other", name="category_enum", create_type=False),
+        nullable=False,
+    )
+    priority: Mapped[str] = mapped_column(
+        ENUM("high", "normal", "low", name="priority_enum", create_type=False), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        ENUM("open", "in_progress", "resolved", "rejected", name="status_enum", create_type=False),
+        nullable=False,
+    )
     ai_summary: Mapped[str | None] = mapped_column(String(140))
     triaged_by: Mapped[str] = mapped_column(String(30), nullable=False)
     triage_latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -30,7 +39,7 @@ class ComplaintRow(Base):
 
 def _to_model(row: ComplaintRow) -> Complaint:
     return Complaint(
-        id=UUID(row.id), text=row.text, location=row.location, reporter_contact=row.reporter_contact,
+        id=row.id, text=row.text, location=row.location, reporter_contact=row.reporter_contact,
         category=Category(row.category), priority=Priority(row.priority), status=Status(row.status),
         ai_summary=row.ai_summary, triaged_by=row.triaged_by, triage_latency_ms=row.triage_latency_ms,
         created_at=row.created_at, updated_at=row.updated_at,
@@ -40,7 +49,6 @@ def _to_model(row: ComplaintRow) -> Complaint:
 class SqlAlchemyComplaintRepository:
     def __init__(self, database_url: str) -> None:
         self.engine: Engine = create_engine(database_url, pool_pre_ping=True)
-        Base.metadata.create_all(self.engine)
 
     def healthcheck(self) -> bool:
         try:
@@ -54,7 +62,7 @@ class SqlAlchemyComplaintRepository:
         with Session(self.engine) as session:
             session.add(
                 ComplaintRow(
-                    id=str(complaint.id),
+                    id=complaint.id,
                     text=complaint.text,
                     location=complaint.location,
                     reporter_contact=complaint.reporter_contact,
