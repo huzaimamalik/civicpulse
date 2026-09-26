@@ -72,6 +72,9 @@ class RateLimiter:
         self._hits[key] = hits
         return True
 
+    def retry_after(self) -> int:
+        return 60
+
 
 @dataclass
 class TriageService:
