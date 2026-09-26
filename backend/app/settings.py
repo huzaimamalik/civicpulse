@@ -4,10 +4,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    database_url: str = "sqlite:///./civicpulse.db"
-    redis_url: str = ""
+    database_url: str = "postgresql+psycopg://postgres:civicpulse_dev@localhost:5432/civicpulse"
+    redis_url: str = "redis://localhost:6379/0"
     triage_provider: str = "simulated"
     rate_limit_per_min: int = 10
+    testing: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
