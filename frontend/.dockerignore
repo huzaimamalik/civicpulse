@@ -1,0 +1,19 @@
+.git
+.env
+.env.*
+node_modules
+dist
+coverage
+.vite
+.npm-cache
+.qa
+.cache
+playwright-report
+test-results
+*.log
+*.tsbuildinfo
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+# tests/ stays in the build context because tsconfig.json includes it.
