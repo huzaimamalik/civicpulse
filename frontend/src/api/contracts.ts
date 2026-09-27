@@ -14,7 +14,7 @@ export interface ComplaintQuery {
   page_size: number;
 }
 
-// These are frontend service results, not assertions about backend JSON envelopes.
+// ComplaintList matches backend.models.ComplaintList; stats adds the X-Cache header.
 export interface ComplaintList {
   complaints: Complaint[];
   total: number;

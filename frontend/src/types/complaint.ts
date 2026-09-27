@@ -17,7 +17,7 @@ export const statuses = [
 export type Category = (typeof categories)[number];
 export type Priority = (typeof priorities)[number];
 export type Status = (typeof statuses)[number];
-export type Provider = "llm:groq" | "llm:ollama" | "rules" | "rules:fallback";
+export type Provider = string;
 
 export interface Complaint {
   id: string;
@@ -37,7 +37,7 @@ export interface Complaint {
 export interface SubmitComplaintInput {
   text: string;
   location: string;
-  reporter_contact: string | null;
+  reporter_contact?: string | null;
 }
 
 export const labels: Record<Category | Priority | Status, string> = {

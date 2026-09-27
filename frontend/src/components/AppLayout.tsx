@@ -39,7 +39,7 @@ export function AppLayout() {
         </nav>
         <span className="demo-label">
           <span />
-          Mock data
+          Civic complaints
         </span>
       </header>
       <main id="main-content" tabIndex={-1}>
@@ -49,7 +49,7 @@ export function AppLayout() {
         <strong>
           CivicPulse <span>/</span> Intake &amp; operations
         </strong>
-        <span>Frontend demonstration</span>
+        <span>Complaint management</span>
       </footer>
     </div>
   );
