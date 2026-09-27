@@ -10,7 +10,8 @@ RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime
 
-RUN rm -f /etc/nginx/conf.d/default.conf \
+RUN apk upgrade --no-cache \
+    && rm -f /etc/nginx/conf.d/default.conf \
     && rm -rf /usr/share/nginx/html/*
 
 COPY nginx.conf /etc/nginx/nginx.conf
