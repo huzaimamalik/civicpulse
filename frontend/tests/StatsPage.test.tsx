@@ -1,13 +1,17 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { api } from "../src/api/client";
-import { createMockService } from "../src/mocks/service";
 import { StatsPage } from "../src/pages/StatsPage";
 
 it("renders aggregate counts and changes from header-derived Cache MISS to Cache HIT on refresh", async () => {
-  const service = createMockService({ delayMs: 0 });
-  vi.spyOn(api, "getStats").mockImplementation(service.getStats);
+  const stats = {
+    byCategory: { water: 4, electricity: 3, sanitation: 3, roads: 3, streetlights: 3, other: 2 },
+    byPriority: { high: 5, normal: 8, low: 5 },
+  };
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(stats), { headers: { "X-Cache": "MISS" } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify(stats), { headers: { "X-Cache": "HIT" } }));
+  vi.stubGlobal("fetch", fetchMock);
   render(<StatsPage />);
   expect(await screen.findByText("Cache MISS")).toBeVisible();
   expect(
@@ -37,4 +41,5 @@ it("renders aggregate counts and changes from header-derived Cache MISS to Cache
   await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
   expect(await screen.findByText("Cache HIT")).toBeVisible();
   expect(screen.queryByText("Cache MISS")).not.toBeInTheDocument();
+  expect(fetchMock).toHaveBeenLastCalledWith("/api/stats", expect.objectContaining({ signal: expect.any(AbortSignal) }));
 });

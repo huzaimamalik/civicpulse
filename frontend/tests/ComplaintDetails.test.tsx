@@ -3,16 +3,21 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { ComplaintDetails } from "../src/components/ComplaintDetails";
 import { complaintFixtures } from "../src/mocks/complaints";
-import { createMockService } from "../src/mocks/service";
+import { api } from "../src/api/client";
 
 it("offers every status for a resolved complaint and displays the exact 409 response", async () => {
-  const service = createMockService({ statusConflict: true, delayMs: 0 });
+  const message = "cannot transition from resolved to in_progress";
+  const fetchMock = vi.fn().mockResolvedValue(new Response(
+    JSON.stringify({ detail: message }),
+    { status: 409, headers: { "Content-Type": "application/json" } },
+  ));
+  vi.stubGlobal("fetch", fetchMock);
   const onUpdated = vi.fn();
   render(
     <ComplaintDetails
       complaint={complaintFixtures[5]}
       onClose={vi.fn()}
-      onUpdate={service.updateStatus}
+      onUpdate={api.updateStatus}
       onUpdated={onUpdated}
     />,
   );
@@ -30,7 +35,11 @@ it("offers every status for a resolved complaint and displays the exact 409 resp
     "Unable to update status",
   );
   expect(
-    screen.getByText("Invalid status transition: resolved -> in_progress"),
-  ).toHaveTextContent(/^Invalid status transition: resolved -> in_progress$/);
+    screen.getByText(message),
+  ).toBeVisible();
+  expect(fetchMock).toHaveBeenCalledWith(
+    `/api/complaints/${complaintFixtures[5].id}/status`,
+    expect.objectContaining({ method: "PATCH", body: JSON.stringify({ status: "in_progress" }) }),
+  );
   expect(onUpdated).not.toHaveBeenCalled();
 });
