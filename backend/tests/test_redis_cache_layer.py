@@ -20,10 +20,9 @@ def real_client(monkeypatch):
     if not _run_real_redis_tests():
         pytest.skip("set RUN_REAL_REDIS_TESTS=1 to run against the real Redis container")
     monkeypatch.setenv("TESTING", "false")
-    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://postgres:civicpulse_dev@localhost:5432/civicpulse")
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     get_settings.cache_clear()
-    redis = Redis.from_url("redis://localhost:6379/0", decode_responses=True)
+    settings = get_settings()
+    redis = Redis.from_url(settings.redis_url, decode_responses=True)
     redis.delete("civicpulse:stats")
     for key in redis.scan_iter("civicpulse:rate:*"):
         redis.delete(key)

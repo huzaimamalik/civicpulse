@@ -1,8 +1,19 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import DateTime, Engine, Integer, String, Text, create_engine, select, text
-from sqlalchemy.dialects.postgresql import ENUM, UUID as PostgreSQLUUID
+from sqlalchemy import (
+    DateTime,
+    Engine,
+    Integer,
+    String,
+    Text,
+    create_engine,
+    select,
+    text,
+)
+from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from .models import Category, Complaint, Priority, Status
@@ -55,7 +66,7 @@ class SqlAlchemyComplaintRepository:
             with self.engine.connect() as connection:
                 connection.execute(text("SELECT 1"))
             return True
-        except Exception:
+        except SQLAlchemyError:
             return False
 
     def create(self, complaint: Complaint) -> Complaint:

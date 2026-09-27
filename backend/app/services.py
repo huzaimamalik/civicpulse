@@ -13,8 +13,7 @@ from .models import (
     TriageResult,
     new_complaint,
 )
-from .repositories import ComplaintRepository
-
+from .repositories import ComplaintRepositoryProtocol
 
 ALLOWED_TRANSITIONS: dict[Status, set[Status]] = {
     Status.OPEN: {Status.IN_PROGRESS, Status.REJECTED},
@@ -89,7 +88,7 @@ class TriageService:
             provider_name = self.provider.name
             fallback_used = False
             error_class = None
-        except Exception as error:
+        except (RuntimeError, TimeoutError, ValueError) as error:
             result = self.fallback.triage(text, location)
             provider_name = "rules:fallback"
             fallback_used = True
@@ -100,7 +99,7 @@ class TriageService:
 
 
 class ComplaintService:
-    def __init__(self, repository: ComplaintRepository, triage: TriageService) -> None:
+    def __init__(self, repository: ComplaintRepositoryProtocol, triage: TriageService) -> None:
         self.repository = repository
         self.triage = triage
 
