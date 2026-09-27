@@ -1,7 +1,8 @@
 import json
-from time import time
-from time import monotonic
+from time import monotonic, time
 from typing import Any
+
+import redis
 
 
 class Cache:
@@ -10,12 +11,10 @@ class Cache:
         self._redis = None
         if redis_url:
             try:
-                import redis
-
                 self._redis = redis.from_url(redis_url, decode_responses=True)
                 if not allow_in_memory:
                     self._redis.ping()
-            except Exception as error:
+            except (redis.RedisError, ValueError) as error:
                 self._redis = None
                 if not allow_in_memory:
                     raise RuntimeError("REDIS_URL is configured but Redis is unavailable") from error
@@ -33,7 +32,7 @@ class Cache:
             return True
         try:
             return bool(self._redis.ping())
-        except Exception:
+        except redis.RedisError:
             return False
 
     def get_json(self, key: str) -> Any | None:

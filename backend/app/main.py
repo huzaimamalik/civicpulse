@@ -22,10 +22,17 @@ from .models import (
     Status,
     StatusUpdate,
 )
-from .repositories import ComplaintRepository
-from .sql_repository import SqlAlchemyComplaintRepository
-from .services import ComplaintService, FailingTriage, InvalidTransition, RateLimiter, SimulatedTriage, TriageService
+from .repositories import ComplaintRepository, ComplaintRepositoryProtocol
+from .services import (
+    ComplaintService,
+    FailingTriage,
+    InvalidTransition,
+    RateLimiter,
+    SimulatedTriage,
+    TriageService,
+)
 from .settings import get_settings
+from .sql_repository import SqlAlchemyComplaintRepository
 
 logger = getLogger("civicpulse")
 REQUESTS = Counter("civicpulse_requests_total", "HTTP requests", ["method", "path", "status"])
@@ -40,7 +47,7 @@ async def lifespan(app: FastAPI):
     configure_logging()
     settings = get_settings()
     if settings.testing:
-        repository = ComplaintRepository()
+        repository: ComplaintRepositoryProtocol = ComplaintRepository()
     else:
         if not settings.database_url.startswith("postgresql"):
             raise RuntimeError("DATABASE_URL must point to PostgreSQL outside test mode")

@@ -1,8 +1,30 @@
-from threading import RLock
 from datetime import datetime, timezone
+from threading import RLock
+from typing import Protocol
 from uuid import UUID
 
 from .models import Category, Complaint, Priority, Status
+
+
+class ComplaintRepositoryProtocol(Protocol):
+    def healthcheck(self) -> bool: ...
+
+    def create(self, complaint: Complaint) -> Complaint: ...
+
+    def get(self, complaint_id: UUID) -> Complaint | None: ...
+
+    def list(
+        self,
+        category: Category | None,
+        priority: Priority | None,
+        status: Status | None,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[Complaint], int]: ...
+
+    def update_status(self, complaint_id: UUID, status: Status) -> Complaint | None: ...
+
+    def stats(self) -> dict[str, dict[str, int]]: ...
 
 
 class ComplaintRepository:

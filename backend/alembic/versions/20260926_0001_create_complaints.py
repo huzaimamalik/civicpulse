@@ -14,10 +14,12 @@ depends_on = None
 
 category_enum = postgresql.ENUM(
     "water", "electricity", "sanitation", "roads", "streetlights", "other",
-    name="category_enum",
+    name="category_enum", create_type=False,
 )
-priority_enum = postgresql.ENUM("high", "normal", "low", name="priority_enum")
-status_enum = postgresql.ENUM("open", "in_progress", "resolved", "rejected", name="status_enum")
+priority_enum = postgresql.ENUM("high", "normal", "low", name="priority_enum", create_type=False)
+status_enum = postgresql.ENUM(
+    "open", "in_progress", "resolved", "rejected", name="status_enum", create_type=False
+)
 
 
 def upgrade() -> None:
