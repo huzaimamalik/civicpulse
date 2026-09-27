@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+# Replace newName with the actual image repository and newTag with its commit SHA.
+# Kustomize does not expand shell variables such as IMAGE_TAG in YAML.
+images:
+  - name: civicpulse-backend
+    newName: civicpulse-backend
+    newTag: replace-with-commit-sha
+  - name: civicpulse-frontend
+    newName: civicpulse-frontend
+    newTag: replace-with-commit-sha
+# Replace the base civicpulse.example.invalid host with the deployment's actual host.
