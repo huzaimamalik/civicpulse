@@ -63,6 +63,7 @@ export function createMockService(options: MockOptions = {}): CivicPulseApi {
       // A fixed response fixture demonstrates triage output without implementing classification.
       const complaint = {
         ...input,
+        reporter_contact: input.reporter_contact ?? null,
         id: `c27c5b60-1e2a-4d82-a917-${String(sequence).padStart(12, "0")}`,
         category: "other" as const,
         priority: "normal" as const,
@@ -110,7 +111,7 @@ export function createMockService(options: MockOptions = {}): CivicPulseApi {
       if (options.statusConflict)
         throw new ApiError(
           409,
-          "Invalid status transition: resolved -> in_progress",
+          "cannot transition from resolved to in_progress",
         );
       const complaint = findComplaint(id);
       complaint.status = status;

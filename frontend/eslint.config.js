@@ -5,7 +5,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 
 export default tseslint.config(
-  { ignores: ["dist", "coverage", ".npm-cache", ".qa"] },
+  { ignores: ["dist", "coverage", ".npm-cache", ".qa", ".vite"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
