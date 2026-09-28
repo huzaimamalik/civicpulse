@@ -1,18 +1,18 @@
 from collections import deque
 from dataclasses import dataclass
+from hashlib import sha256
 from time import monotonic, perf_counter
-from typing import Protocol
 
+from .cache import Cache
 from .models import (
-    Category,
     Complaint,
     ComplaintCreate,
-    Priority,
     ProviderOutcome,
     Status,
     TriageResult,
     new_complaint,
 )
+from .providers.triage.base import TriageProvider, TriageProviderError
 from .repositories import ComplaintRepositoryProtocol
 
 ALLOWED_TRANSITIONS: dict[Status, set[Status]] = {
@@ -21,32 +21,6 @@ ALLOWED_TRANSITIONS: dict[Status, set[Status]] = {
     Status.RESOLVED: set(),
     Status.REJECTED: set(),
 }
-
-
-class TriageProvider(Protocol):
-    name: str
-
-    def triage(self, text: str, location: str) -> TriageResult: ...
-
-
-class SimulatedTriage:
-    name = "rules"
-
-    def triage(self, text: str, location: str) -> TriageResult:
-        lowered = text.lower()
-        category = Category.OTHER
-        for keyword, candidate in (
-            ("water", Category.WATER),
-            ("electric", Category.ELECTRICITY),
-            ("sanitation", Category.SANITATION),
-            ("road", Category.ROADS),
-            ("streetlight", Category.STREETLIGHTS),
-        ):
-            if keyword in lowered:
-                category = candidate
-                break
-        priority = Priority.HIGH if any(word in lowered for word in ("urgent", "danger", "emergency")) else Priority.NORMAL
-        return TriageResult(category=category, priority=priority, summary=text.strip()[:140], confidence=0.95)
 
 
 class FailingTriage:
@@ -80,15 +54,33 @@ class TriageService:
     provider: TriageProvider
     fallback: TriageProvider
     outcomes: deque[ProviderOutcome]
+    cache: Cache | None = None
 
     def triage(self, text: str, location: str) -> tuple[TriageResult, str, int, bool, str | None]:
         started = perf_counter()
+        cache_key = f"civicpulse:triage:{sha256(text.encode('utf-8')).hexdigest()}"
+        if self.cache is not None:
+            cached = self.cache.get_json(cache_key)
+            if cached is not None:
+                result = TriageResult.model_validate(cached["result"])
+                provider_name = cached["provider"]
+                latency_ms = round((perf_counter() - started) * 1000)
+                self.outcomes.append(
+                    ProviderOutcome(provider=provider_name, latency_ms=latency_ms, fallback=False)
+                )
+                return result, provider_name, latency_ms, False, None
         try:
             result = self.provider.triage(text, location)
             provider_name = self.provider.name
             fallback_used = False
             error_class = None
-        except (RuntimeError, TimeoutError, ValueError) as error:
+            if self.cache is not None:
+                self.cache.set_json(
+                    cache_key,
+                    {"result": result.model_dump(mode="json"), "provider": provider_name},
+                    24 * 60 * 60,
+                )
+        except (TriageProviderError, RuntimeError, TimeoutError, ValueError) as error:
             result = self.fallback.triage(text, location)
             provider_name = "rules:fallback"
             fallback_used = True
