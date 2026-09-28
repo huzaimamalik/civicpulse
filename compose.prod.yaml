@@ -32,6 +32,9 @@ services:
       TRIAGE_PROVIDER: ${TRIAGE_PROVIDER:-simulated}
       RATE_LIMIT_PER_MIN: ${RATE_LIMIT_PER_MIN:-10}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:1b}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     networks:
       - edge
@@ -40,6 +43,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).close()"]
@@ -103,6 +108,30 @@ services:
         reservations:
           memory: 32M
 
+  ollama:
+    image: ollama/ollama:0.34.4
+    environment:
+      OLLAMA_NO_CLOUD: "true"
+    volumes:
+      - ollama_models:/root/.ollama
+    # Keep Ollama isolated from the frontend on the internal network.
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 2G
+        reservations:
+          memory: 512M
+
 networks:
   edge:
     driver: bridge
@@ -113,4 +142,4 @@ networks:
 volumes:
   pgdata:
   redisdata:
-  # ollama_models is unresolved: the rubric requires three volumes, but no Ollama provider exists yet.
+  ollama_models:

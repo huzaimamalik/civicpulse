@@ -48,6 +48,10 @@ Controls page in our own Console:
   is offered (per third-party review; not confirmed in Groq's docs).
 - **Terms can change:** this ADR must be re-checked before any production use.
 
+## Local Ollama data flow
+
+With `TRIAGE_PROVIDER=ollama`, the backend sends the same `text` and `location` to the local Ollama container at `OLLAMA_BASE_URL`; `reporter_contact` is still excluded. The default `llama3.2:1b` model runs locally and `OLLAMA_NO_CLOUD=true` disables cloud inference. Complaint inference remains on the machine and works offline after the one-time model download. Ollama's edge-network access permits downloading weights; no Ollama port is published to the host. Hosted Groq inference sends complaint data off the machine under the decision above. Changing `OLLAMA_BASE_URL` to a remote server changes this local-data assumption.
+
 ## Consequences
 
 - With ZDR enabled, Groq does not store inputs or outputs for reliability or

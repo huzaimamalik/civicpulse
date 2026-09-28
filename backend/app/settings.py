@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     triage_provider: str = "simulated"
     groq_api_key: str | None = None
-    groq_model: str = "whisper-large-v3"
+    groq_model: str = "openai/gpt-oss-20b"
+    ollama_base_url: str = "http://ollama:11434"
+    ollama_model: str = "llama3.2:1b"
     rate_limit_per_min: int = 10
     testing: bool = False
 

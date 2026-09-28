@@ -57,6 +57,8 @@ async def lifespan(app: FastAPI):
         settings.triage_provider,
         groq_api_key=settings.groq_api_key,
         groq_model=settings.groq_model,
+        ollama_base_url=settings.ollama_base_url,
+        ollama_model=settings.ollama_model,
     )
     triage = TriageService(
         provider=provider,
