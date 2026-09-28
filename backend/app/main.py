@@ -22,13 +22,12 @@ from .models import (
     Status,
     StatusUpdate,
 )
+from .providers.triage import RuleBasedTriage, create_provider
 from .repositories import ComplaintRepository, ComplaintRepositoryProtocol
 from .services import (
     ComplaintService,
-    FailingTriage,
     InvalidTransition,
     RateLimiter,
-    SimulatedTriage,
     TriageService,
 )
 from .settings import get_settings
@@ -52,10 +51,19 @@ async def lifespan(app: FastAPI):
         if not settings.database_url.startswith("postgresql"):
             raise RuntimeError("DATABASE_URL must point to PostgreSQL outside test mode")
         repository = SqlAlchemyComplaintRepository(settings.database_url)
-    provider = FailingTriage() if settings.triage_provider == "failing" else SimulatedTriage()
-    triage = TriageService(provider=provider, fallback=SimulatedTriage(), outcomes=deque(maxlen=20))
     app.state.repository = repository
     app.state.cache = Cache(settings.redis_url, allow_in_memory=settings.testing)
+    provider = create_provider(
+        settings.triage_provider,
+        groq_api_key=settings.groq_api_key,
+        groq_model=settings.groq_model,
+    )
+    triage = TriageService(
+        provider=provider,
+        fallback=RuleBasedTriage(),
+        outcomes=deque(maxlen=20),
+        cache=app.state.cache,
+    )
     app.state.service = ComplaintService(repository, triage)
     app.state.rate_limiter = (
         RateLimiter(settings.rate_limit_per_min)
