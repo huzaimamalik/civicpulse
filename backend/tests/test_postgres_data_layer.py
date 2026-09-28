@@ -2,13 +2,12 @@ import os
 from pathlib import Path
 
 import pytest
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
+from alembic import command
 from app.settings import get_settings
-
 
 DATABASE_URL = os.getenv("DATABASE_URL") or get_settings().database_url
 pytestmark = pytest.mark.skipif(
@@ -93,8 +92,7 @@ def test_migration_and_database_constraints_against_real_postgres():
         """
     )
     for values in invalid_values:
-        with pytest.raises((IntegrityError, DBAPIError)):
-            with engine.begin() as connection:
-                connection.execute(statement, values)
+        with pytest.raises((IntegrityError, DBAPIError)), engine.begin() as connection:
+            connection.execute(statement, values)
 
     engine.dispose()
