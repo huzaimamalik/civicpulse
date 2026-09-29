@@ -35,6 +35,9 @@ export const options = {
 
 export default function () {
   const response = http.get(`${baseUrl}/api/complaints?page=1&page_size=20`, {
+    headers: {
+      Host: "civicpulse.local",
+    },
     timeout: "10s",
   });
   check(response, { "complaints returns 200": (result) => result.status === 200 });
