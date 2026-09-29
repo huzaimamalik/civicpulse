@@ -1,12 +1,12 @@
 from functools import lru_cache
-
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:civicpulse_dev@localhost:5432/civicpulse"
     redis_url: str = "redis://localhost:6379/0"
-    triage_provider: str = "simulated"
+    triage_provider: Literal["simulated", "rules", "llm", "ollama"] = "simulated"
     groq_api_key: str | None = None
     groq_model: str = "openai/gpt-oss-20b"
     ollama_base_url: str = "http://ollama:11434"
