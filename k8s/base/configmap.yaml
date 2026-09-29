@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: civicpulse-config
+data:
+  POSTGRES_DB: civicpulse
+  POSTGRES_USER: civicpulse
+  REDIS_URL: redis://redis:6379/0
+  TRIAGE_PROVIDER: simulated
+  RATE_LIMIT_PER_MIN: "10"

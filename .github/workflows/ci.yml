@@ -1,0 +1,183 @@
+name: CI
+
+on:
+  # The acceptance checklist requires every PR, including feature -> dev.
+  pull_request:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint-and-type:
+    name: lint-and-type
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Install backend dependencies and quality tools
+        working-directory: backend
+        run: python -m pip install -r requirements.txt ruff==0.16.9 mypy==2.3.1
+      - name: Backend lint
+        working-directory: backend
+        run: ruff check app
+      - name: Backend types
+        working-directory: backend
+        run: mypy app
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run lint
+        working-directory: frontend
+      - run: npm run typecheck
+        working-directory: frontend
+
+  test-backend:
+    name: test-backend
+    runs-on: ubuntu-24.04
+    env:
+      TRIAGE_PROVIDER: simulated
+      RUN_REAL_REDIS_TESTS: '1'
+      # Must match the existing real Redis fixture's local PostgreSQL URL.
+      DATABASE_URL: postgresql+psycopg://postgres:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/civicpulse
+      REDIS_URL: redis://localhost:6379/0
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: civicpulse
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d civicpulse"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+        working-directory: backend
+      - name: Migrate the test database
+        run: alembic upgrade head
+        working-directory: backend
+      - name: Run all backend tests with coverage
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=65
+        working-directory: backend
+
+  test-frontend:
+    name: test-frontend
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+
+  build:
+    name: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: docker build -t civicpulse-backend:ci ./backend
+      - run: docker build -t civicpulse-frontend:ci ./frontend
+
+  scan:
+    name: scan
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Jobs have separate Docker daemons. Rebuilding avoids an image artifact chain.
+      - run: docker build -t civicpulse-backend:ci ./backend
+      - run: docker build -t civicpulse-frontend:ci ./frontend
+      - name: Install Trivy 0.74.0
+        run: |
+          curl -fsSL https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz -o "$RUNNER_TEMP/trivy.tar.gz"
+          tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
+          sudo install "$RUNNER_TEMP/trivy" /usr/local/bin/trivy
+      - name: Scan backend
+        run: trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 civicpulse-backend:ci
+      - name: Scan frontend
+        if: ${{ !cancelled() }}
+        run: trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 civicpulse-frontend:ci
+
+  manifests:
+    name: manifests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install manifest tools
+        run: |
+          curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.8.1/kustomize_v5.8.1_linux_amd64.tar.gz -o "$RUNNER_TEMP/kustomize.tar.gz"
+          tar -xzf "$RUNNER_TEMP/kustomize.tar.gz" -C "$RUNNER_TEMP" kustomize
+          sudo install "$RUNNER_TEMP/kustomize" /usr/local/bin/kustomize
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz -o "$RUNNER_TEMP/kubeconform.tar.gz"
+          tar -xzf "$RUNNER_TEMP/kubeconform.tar.gz" -C "$RUNNER_TEMP" kubeconform
+          sudo install "$RUNNER_TEMP/kubeconform" /usr/local/bin/kubeconform
+      - name: Validate rendered production resources
+        # Only VPA is skipped here; CD validates it against the installed official CRD.
+        # Missing schemas for any other kind remain fatal.
+        run: kustomize build k8s/overlays/prod | kubeconform -strict -summary -kubernetes-version 1.32.0 -skip VerticalPodAutoscaler
+
+  integration:
+    name: integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      TRIAGE_PROVIDER: simulated
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+      DATABASE_URL: postgresql+psycopg://civicpulse:${{ secrets.CI_POSTGRES_PASSWORD }}@postgres:5432/civicpulse
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Start the existing Compose stack
+        run: docker compose up --build -d --wait --wait-timeout 180
+      - name: Wait for database and cache readiness
+        run: curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-delay 2 --retry-max-time 120 --max-time 5 http://localhost:8000/ready
+      - name: Apply Alembic migrations
+        run: docker compose exec -T backend alembic upgrade head
+      - name: Exercise the API through frontend nginx
+        env:
+          SMOKE_URL: http://localhost:8080
+        run: python .github/scripts/smoke.py
+      - name: Clean up containers and volumes
+        if: always()
+        run: docker compose down -v
