@@ -70,8 +70,33 @@ and Copilot was explicitly instructed not to leave silent in-memory
 fallbacks active outside an explicit test mode. Commit messages and file
 groupings were proposed by Copilot but reviewed and executed manually.
 
-## Muhammad Huzaima, 24I-3014 (Frontend, Docker/Compose, Kubernetes, CI/CD)
+## Muhammad Huzaima Malik, 24I-3014 (Frontend, Docker/Compose, Kubernetes, CI/CD)
 
-*To be filled in by [Partner B] following the same format as above:
-which tool(s) were used for which segment, what was AI-generated vs.
-manually written, and what was changed after review and why.*
+### Astra — implementation, infrastructure work, and repository review
+
+Astra was used as the main coding agent for my assigned parts of the project. It was given the existing repository context and the relevant assignment requirements, then used to inspect, implement, verify, and refine changes within a tightly defined scope. Astra was explicitly instructed not to perform Git operations, so all branching, commits, pushes, pull requests, conflict resolution, reviews, and merges were done manually by me.
+
+- **Frontend and integration**: reviewed and refined the React frontend integration with the backend API, including runtime use of relative `/api` routes, nginx proxy behavior, frontend/backend container communication, and the existing frontend test setup.
+- **Docker and Compose**: worked on the multi-stage frontend and backend images, `.dockerignore` configuration, health checks, network separation, named volumes, production Compose configuration, and service-to-service communication. It also helped verify that the frontend could not directly reach PostgreSQL while the backend remained able to communicate with internal services.
+- **Local inference infrastructure**: helped integrate and validate the Ollama container setup used for local inference, including its persistent model volume, internal networking, and backend connectivity, without exposing the Ollama service directly to the host.
+- **Kubernetes**: implemented and reviewed the Kubernetes base resources and overlays, including Deployments, the PostgreSQL StatefulSet and PVC, ClusterIP Services, Ingress, ConfigMap/Secret separation, resource requests and limits, startup/liveness/readiness probes, PDB, HPA, and VPA in recommender mode.
+- **CI/CD**: worked on the GitHub Actions workflows for linting, typing, tests, Docker image builds, Trivy scanning, manifest validation, Compose integration testing, GHCR publishing, SHA-based deployment, SBOM generation, and deployment to an ephemeral k3d cluster. Deterministic CI behavior was preserved by using the simulated triage provider in automated tests.
+- **Load testing and autoscaling validation**: helped prepare and refine the k6 load test used to drive the HPA, including routing requests through the local Ingress host. The resulting HPA timelines, VPA recommendations, and before/after scaling behavior were then reviewed manually before being documented.
+- **Submission tooling and evidence**: created the read-only `scripts/check_submission.py` checker near the end of the project to catch missing submission files and obvious deployment mistakes without altering the application. It was also used to help review the final documentation and evidence set before submission.
+
+Astra’s changes were not accepted blindly. I reviewed the affected files, ran or inspected the relevant tests and runtime checks, and corrected issues when they appeared. For example, I manually investigated a Ruff import-order failure after introducing `Literal` validation in `backend/app/settings.py`, verified the real HPA/VPA behavior under load, and resolved the deliberate merge conflict by keeping the stricter deterministic provider configuration.
+
+### ChatGPT — technical consultation, troubleshooting, and submission review
+
+ChatGPT was used mainly as a consultation and review tool rather than as the primary coding agent. It was used to interpret detailed assignment requirements, check whether implemented behavior matched the rubric, troubleshoot infrastructure and CI failures, plan the required evidence, and review the final submission sequence.
+
+Specific uses included:
+
+- reviewing Docker, Kubernetes, HPA/VPA, CI/CD, and collaboration requirements against the assignment;
+- troubleshooting Docker networking, local Ollama connectivity, Kubernetes persistence, HPA scaling, VPA recommendations, and GitHub Actions failures;
+- helping interpret measured results from the k6 and autoscaling experiments instead of assuming expected behavior;
+- planning and checking the deliberate merge-conflict demonstration and required screenshots;
+- reviewing branch-protection, PR/Issue linkage, substantive review, cache, AI fallback, persistence, and autoscaling evidence;
+- helping organize the final submission checklist, including `git shortlog -sn`, the CD run, GHCR SHA-tagged images, the HPA evidence, and `scripts/check_submission.py`.
+
+All repository changes, Git operations, pull requests, evidence captures, and final decisions were performed manually by me after reviewing the outputs and confirming that they matched the actual repository state.
